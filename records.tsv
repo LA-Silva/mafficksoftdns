@@ -1,0 +1,10 @@
+name	type	value	priority
+example.com.	A	1.2.3.4	0
+example.com.	MX	mail.example.com.	10
+mail.example.com.	A	2.3.4.5	0
+example.com.	TXT	v=spf1 include:_spf.google.com ~all	0
+www.example.com.	CNAME	example.com.	0
+web.local.	A	192.168.1.10	0
+web.local.	A	192.168.1.11	0
+web.local.	A	192.168.1.12	0
+

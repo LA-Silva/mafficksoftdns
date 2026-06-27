@@ -1,0 +1,180 @@
+package main
+
+import (
+	"encoding/csv"
+	"flag"
+	"fmt"
+	"io"
+	"log"
+	"net"
+	"os"
+	"os/signal"
+	"strings"
+	"sync"
+	"sync/atomic"
+	"syscall"
+	"time"
+
+	"github.com/miekg/dns"
+)
+
+type Record struct {
+	Name  string
+	Type  uint16
+	Value string
+}
+
+type DataStore struct {
+	Records []Record
+	Count   int
+}
+
+var (
+	buffers      [2]*DataStore
+	activeIndex  int32
+	reloadLock   sync.Mutex
+	startTime    time.Time
+	
+	// Flags
+	maxRecords int
+	port       int
+	tsvPath    string
+
+	// Stats Counters
+	queryCounter uint64
+	rps1m        float64
+	rps5m        float64
+)
+
+const HealthCheckDomain = "checkstatus.local."
+
+func loadRecords() error {
+	reloadLock.Lock()
+	defer reloadLock.Unlock()
+
+	currentActive := atomic.LoadInt32(&activeIndex)
+	inactiveIndex := 1 - currentActive
+	targetBuf := buffers[inactiveIndex]
+
+	file, err := os.Open(tsvPath)
+	if err != nil {
+		return fmt.Errorf("could not open tsv file: %w", err)
+	}
+	defer file.Close()
+
+	reader := csv.NewReader(file)
+	reader.Comma = '\t'
+	if _, err := reader.Read(); err != nil { // Skip header
+		return fmt.Errorf("could not read header: %w", err)
+	}
+
+	count := 0
+	for {
+		row, err := reader.Read()
+		if err == io.EOF { break }
+		if err != nil { return err }
+		if count >= maxRecords { break }
+
+		targetBuf.Records[count] = Record{
+			Name:  strings.ToLower(dns.Fqdn(row[0])),
+			Type:  dns.StringToType[strings.ToUpper(row[1])],
+			Value: row[2],
+		}
+		count++
+	}
+	targetBuf.Count = count
+	atomic.StoreInt32(&activeIndex, inactiveIndex)
+	return nil
+}
+
+func monitorStats() {
+	var lastCount uint64
+	ticker := time.NewTicker(5 * time.Second)
+	for range ticker.C {
+		currentCount := atomic.LoadUint64(&queryCounter)
+		delta := currentCount - lastCount
+		lastCount = currentCount
+		currentRPS := float64(delta) / 5.0
+		rps1m = (currentRPS * 0.083) + (rps1m * (1 - 0.083))
+		rps5m = (currentRPS * 0.016) + (rps5m * (1 - 0.016))
+	}
+}
+
+func handleDnsRequest(w dns.ResponseWriter, r *dns.Msg) {
+	atomic.AddUint64(&queryCounter, 1)
+	m := new(dns.Msg)
+	m.SetReply(r)
+
+	idx := atomic.LoadInt32(&activeIndex)
+	activeBuf := buffers[idx]
+
+	for _, q := range r.Question {
+		qName := strings.ToLower(q.Name)
+
+		if qName == HealthCheckDomain && q.Qtype == dns.TypeTXT {
+			remoteIP, _, _ := net.SplitHostPort(w.RemoteAddr().String())
+			if remoteIP == "127.0.0.1" || remoteIP == "::1" {
+				statusMsg := fmt.Sprintf("STATUS=OK; REQS=%d; RPS_1M=%.2f; RPS_5M=%.2f; UPTIME=%s", 
+					atomic.LoadUint64(&queryCounter), rps1m, rps5m, time.Since(startTime).Round(time.Second))
+				txt, _ := dns.NewRR(fmt.Sprintf("%s 0 IN TXT \"%s\"", qName, statusMsg))
+				m.Answer = append(m.Answer, txt)
+				w.WriteMsg(m)
+				return
+			}
+		}
+
+		for i := 0; i < activeBuf.Count; i++ {
+			rec := activeBuf.Records[i]
+			if rec.Name == qName && rec.Type == q.Qtype {
+				rrStr := fmt.Sprintf("%s 3600 IN %s %s", rec.Name, dns.TypeToString[rec.Type], rec.Value)
+				if rr, err := dns.NewRR(rrStr); err == nil {
+					m.Answer = append(m.Answer, rr)
+				}
+			}
+		}
+	}
+	w.WriteMsg(m)
+}
+
+func main() {
+	startTime = time.Now()
+
+	// Configure Flags
+	flag.IntVar(&maxRecords, "size", 10000, "Maximum records per buffer")
+	flag.IntVar(&port, "port", 5353, "UDP port to listen on")
+	flag.StringVar(&tsvPath, "file", "records.tsv", "Path to the tab-delimited TSV file")
+
+	// Custom Usage Help
+	flag.Usage = func() {
+		fmt.Fprintf(os.Stderr, "GXDNS the Extreme Stable DNS Server\n")
+		fmt.Fprintf(os.Stderr, "Usage: %s [options]\n\nOptions:\n", os.Args[0])
+		flag.PrintDefaults()
+		fmt.Fprintf(os.Stderr, "\nSignals:\n  SIGHUP: Reloads the TSV file into the inactive buffer and swaps.\n")
+	}
+	flag.Parse()
+
+	// Pre-allocate Double Buffers
+	for i := 0; i < 2; i++ {
+		buffers[i] = &DataStore{Records: make([]Record, maxRecords)}
+	}
+
+	if err := loadRecords(); err != nil {
+		log.Fatalf("Fatal: Initial load failed: %v", err)
+	}
+
+	go monitorStats()
+	go func() {
+		sigChan := make(chan os.Signal, 1)
+		signal.Notify(sigChan, syscall.SIGHUP)
+		for range sigChan {
+			if err := loadRecords(); err != nil {
+				log.Printf("Reload failed: %v", err)
+			}
+		}
+	}()
+
+	dns.HandleFunc(".", handleDnsRequest)
+	addr := fmt.Sprintf(":%d", port)
+	log.Printf("Server live on %s (PID: %d). Buffer: %d", addr, os.Getpid(), maxRecords)
+	log.Fatal(dns.ListenAndServe(addr, "udp", nil))
+}
