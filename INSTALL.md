@@ -1,6 +1,6 @@
 # Compile & Install
 
-This document explains how to compile, install, run, and verify the steindns binary included in this repository (mafficksoftdns).
+This document explains how to compile, install, run, and verify the mfsdns binary included in this repository (mafficksoftdns).
 
 ## Prerequisites
 
@@ -22,7 +22,7 @@ This repository includes a small build helper script `build.sh`. You can either 
 Option A — using the provided script:
 
 ```bash
-# Makes bin/steindns using the flags in build.sh
+# Makes bin/mfsdns using the flags in build.sh
 ./build.sh
 ```
 
@@ -31,7 +31,7 @@ Option B — using go build directly (equivalent):
 ```bash
 # Create the output directory then build
 mkdir -p bin
-go build -ldflags='-s -w' -o bin/steindns main.go
+go build -ldflags='-s -w' -o bin/mfsdns main.go
 ```
 
 Notes:
@@ -43,14 +43,14 @@ Notes:
 To install the compiled binary system-wide (requires root):
 
 ```bash
-sudo install -m 0755 bin/steindns /usr/local/bin/steindns
+sudo install -m 0755 bin/mfsdns /usr/local/bin/mfsdns
 ```
 
 Or copy manually:
 
 ```bash
-sudo cp bin/steindns /usr/local/bin/
-sudo chmod 755 /usr/local/bin/steindns
+sudo cp bin/mfsdns /usr/local/bin/
+sudo chmod 755 /usr/local/bin/mfsdns
 ```
 
 ## Configuration & Running
@@ -64,7 +64,7 @@ The server reads records from a TSV file (default `records.tsv` in the repo root
 Example run (foreground):
 
 ```bash
-/usr/local/bin/steindns -file /path/to/records.tsv -port 5353 -size 20000
+/usr/local/bin/mfsdns -file /path/to/records.tsv -port 5353 -size 20000
 ```
 
 The server supports reloading the TSV on receipt of SIGHUP. For example:
@@ -86,19 +86,19 @@ You should see a TXT string containing STATUS=OK, request counts, RPS and uptime
 
 ## Systemd service example (Linux)
 
-Create a unit file `/etc/systemd/system/steindns.service` with the following contents (adjust paths and user as needed):
+Create a unit file `/etc/systemd/system/mfsdns.service` with the following contents (adjust paths and user as needed):
 
 ````ini
 [Unit]
-Description=steindns - Lightweight DNS server
+Description=mfsdns - Lightweight DNS server
 After=network.target
 
 [Service]
 Type=simple
 User=nobody
 Group=nogroup
-ExecStart=/usr/local/bin/steindns -file /etc/steindns/records.tsv -port 5353 -size 20000
-WorkingDirectory=/var/lib/steindns
+ExecStart=/usr/local/bin/mfsdns -file /etc/mfsdns/records.tsv -port 5353 -size 20000
+WorkingDirectory=/var/lib/mfsdns
 Restart=on-failure
 RestartSec=5
 
@@ -106,14 +106,14 @@ RestartSec=5
 WantedBy=multi-user.target
 ````
 
-After creating the unit and placing your `records.tsv` under `/etc/steindns/` (or other chosen location), enable and start the service:
+After creating the unit and placing your `records.tsv` under `/etc/mfsdns/` (or other chosen location), enable and start the service:
 
 ```bash
-sudo mkdir -p /etc/steindns /var/lib/steindns
-sudo cp records.tsv /etc/steindns/records.tsv
+sudo mkdir -p /etc/mfsdns /var/lib/mfsdns
+sudo cp records.tsv /etc/mfsdns/records.tsv
 sudo systemctl daemon-reload
-sudo systemctl enable --now steindns
-sudo systemctl status steindns
+sudo systemctl enable --now mfsdns
+sudo systemctl status mfsdns
 ```
 
 ## Example records.tsv format
@@ -150,10 +150,10 @@ go mod tidy
 To remove the installed binary and unit file:
 
 ```bash
-sudo systemctl disable --now steindns
-sudo rm /etc/systemd/system/steindns.service
+sudo systemctl disable --now mfsdns
+sudo rm /etc/systemd/system/mfsdns.service
 sudo systemctl daemon-reload
-sudo rm /usr/local/bin/steindns
+sudo rm /usr/local/bin/mfsdns
 ```
 
 ## Contact / Notes

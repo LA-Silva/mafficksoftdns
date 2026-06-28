@@ -18,24 +18,20 @@ import (
 	"github.com/miekg/dns"
 )
 
-type Record struct {
-	Name  string
-	Type  uint16
-	Value string
-	TTL   string
-}
-
 type DataStore struct {
-	Records []Record
-	Count   int
+	// Map structure: [lowercase_fqdn_string][dns_type_uint16]slice_of_precompiled_RRs
+	Records map[string]map[uint16][]dns.RR
 }
 
 var (
+	// Application Customization
+	appName = "mfsdns"
+
 	buffers      [2]*DataStore
 	activeIndex  int32
 	reloadLock   sync.Mutex
 	startTime    time.Time
-	
+
 	// Flags
 	maxRecords int
 	port       int
@@ -65,16 +61,26 @@ func loadRecords() error {
 
 	reader := csv.NewReader(file)
 	reader.Comma = '\t'
-	if _, err := reader.Read(); err != nil { 
+	if _, err := reader.Read(); err != nil {
 		return fmt.Errorf("could not read header: %w", err)
 	}
+
+	// Initialize a fresh map for the inactive buffer
+	newRecords := make(map[string]map[uint16][]dns.RR)
 
 	count := 0
 	for {
 		row, err := reader.Read()
-		if err == io.EOF { break }
-		if err != nil { return err }
-		if count >= maxRecords { break }
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			return err
+		}
+		if count >= maxRecords {
+			log.Printf("Warning: reached maxRecords limit of %d. Skipping remaining rows.", maxRecords)
+			break
+		}
 
 		// Parse TTL from 4th column, default to 60 if empty
 		ttlVal := "60"
@@ -82,15 +88,35 @@ func loadRecords() error {
 			ttlVal = strings.TrimSpace(row[3])
 		}
 
-		targetBuf.Records[count] = Record{
-			Name:  strings.ToLower(dns.Fqdn(row[0])),
-			Type:  dns.StringToType[strings.ToUpper(row[1])],
-			Value: row[2],
-			TTL:   ttlVal,
+		name := strings.ToLower(dns.Fqdn(row[0]))
+		typeStr := strings.ToUpper(row[1])
+		qType := dns.StringToType[typeStr]
+		val := row[2]
+
+		// Pre-compile the resource record string into a dns.RR object right here during load time
+		rrStr := fmt.Sprintf("%s %s IN %s %s", name, ttlVal, typeStr, val)
+		rr, err := dns.NewRR(rrStr)
+		if err != nil {
+			log.Printf("Skipping invalid record line %d: %v", count+2, err)
+			continue
 		}
+
+		// Initialize inner maps as needed
+		//if _, exists := newRecords[name]; !exists {
+		//	newRecords[name] = make(map[string]map[uint16][]dns.RR)
+		//}
+		if _, exists := newRecords[name]; !exists {
+		    newRecords[name] = make(map[uint16][]dns.RR) // <-- Corrected
+		}
+
+		newRecords[name][qType] = append(newRecords[name][qType], rr)
+
 		count++
 	}
-	targetBuf.Count = count
+
+	targetBuf.Records = newRecords
+
+	// Atomically point queries to the newly loaded map
 	atomic.StoreInt32(&activeIndex, inactiveIndex)
 	return nil
 }
@@ -121,10 +147,11 @@ func handleDnsRequest(w dns.ResponseWriter, r *dns.Msg) {
 	for _, q := range r.Question {
 		qName := strings.ToLower(q.Name)
 
+		// Internal health check path
 		if qName == HealthCheckDomain && q.Qtype == dns.TypeTXT {
 			remoteIP, _, _ := net.SplitHostPort(w.RemoteAddr().String())
 			if remoteIP == "127.0.0.1" || remoteIP == "::1" {
-				statusMsg := fmt.Sprintf("STATUS=OK; REQS=%d; RPS_1M=%.2f; RPS_5M=%.2f; UPTIME=%s", 
+				statusMsg := fmt.Sprintf("STATUS=OK; REQS=%d; RPS_1M=%.2f; RPS_5M=%.2f; UPTIME=%s",
 					reqID, rps1m, rps5m, time.Since(startTime).Round(time.Second))
 				txt, _ := dns.NewRR(fmt.Sprintf("%s 0 IN TXT \"%s\"", qName, statusMsg))
 				m.Answer = append(m.Answer, txt)
@@ -133,23 +160,17 @@ func handleDnsRequest(w dns.ResponseWriter, r *dns.Msg) {
 			}
 		}
 
-		var matches []dns.RR
-		for i := 0; i < activeBuf.Count; i++ {
-			rec := activeBuf.Records[i]
-			if rec.Name == qName && rec.Type == q.Qtype {
-				// Dynamic TTL from the record
-				rrStr := fmt.Sprintf("%s %s IN %s %s", rec.Name, rec.TTL, dns.TypeToString[rec.Type], rec.Value)
-				if rr, err := dns.NewRR(rrStr); err == nil {
-					matches = append(matches, rr)
+		// O(1) Instant Map Lookup
+		if typeMap, nameExists := activeBuf.Records[qName]; nameExists {
+			if matches, typeExists := typeMap[q.Qtype]; typeExists {
+				count := len(matches)
+				if count > 0 {
+					// Round-robin rotation offset using the atomic counter
+					offset := int(reqID % uint64(count))
+					for i := 0; i < count; i++ {
+						m.Answer = append(m.Answer, matches[(i+offset)%count])
+					}
 				}
-			}
-		}
-
-		count := len(matches)
-		if count > 0 {
-			offset := int(reqID % uint64(count))
-			for i := 0; i < count; i++ {
-				m.Answer = append(m.Answer, matches[(i+offset)%count])
 			}
 		}
 	}
@@ -164,13 +185,14 @@ func main() {
 	flag.StringVar(&tsvPath, "file", "records.tsv", "TSV file path")
 
 	flag.Usage = func() {
-		fmt.Fprintf(os.Stderr, "gxdns - Extreme Stable DNS\nUsage:\n")
+		fmt.Fprintf(os.Stderr, "%s - Extreme Stable DNS\nUsage:\n", appName)
 		flag.PrintDefaults()
 	}
 	flag.Parse()
 
+	// Initialize buffers
 	for i := 0; i < 2; i++ {
-		buffers[i] = &DataStore{Records: make([]Record, maxRecords)}
+		buffers[i] = &DataStore{Records: make(map[string]map[uint16][]dns.RR)}
 	}
 
 	if err := loadRecords(); err != nil {
@@ -182,7 +204,7 @@ func main() {
 		sigChan := make(chan os.Signal, 1)
 		signal.Notify(sigChan, syscall.SIGHUP)
 		for range sigChan {
-			log.Println("SIGHUP received, reloading TSV...")
+			log.Printf("SIGHUP received, reloading TSV...")
 			if err := loadRecords(); err != nil {
 				log.Printf("Reload failed: %v", err)
 			}
@@ -191,7 +213,6 @@ func main() {
 
 	dns.HandleFunc(".", handleDnsRequest)
 	addr := fmt.Sprintf(":%d", port)
-	log.Printf("steindns live on %s (PID: %d) with capacity %d", addr, os.Getpid(), maxRecords)
+	log.Printf("%s live on %s (PID: %d) with capacity %d", appName, addr, os.Getpid(), maxRecords)
 	log.Fatal(dns.ListenAndServe(addr, "udp", nil))
 }
-
