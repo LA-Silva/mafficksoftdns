@@ -1,0 +1,10 @@
+name	type	value	priority
+mafficksoft.com.	A	1.2.3.4	0
+mafficksoft.com.	MX	mail.mafficksoft.com.	10
+mail.mafficksoft.com.	A	2.3.4.5	0
+mafficksoft.com.	TXT	v=spf1 include:_spf.google.com ~all	0
+www.mafficksoft.com.	CNAME	mafficksoft.com.	0
+web.local.	A	192.168.1.10	0
+web.local.	A	192.168.1.11	0
+web.local.	A	192.168.1.12	0
+
