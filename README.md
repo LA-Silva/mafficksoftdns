@@ -1,4 +1,4 @@
-# Mafficksoft DNS (steindns)
+# Mafficksoft DNS (mfsdns)
 
 Lightweight DNS server written in Go. This repository contains the source for a small, fast DNS server that serves records from a TSV file and supports live reload on SIGHUP.
 
@@ -19,9 +19,9 @@ cd mafficksoftdns
 ./build.sh
 # or
 mkdir -p bin
-go build -ldflags='-s -w' -o bin/steindns main.go
+go build -ldflags='-s -w' -o bin/mfsdns main.go
 # run
-./bin/steindns -file records.tsv -port 5353 -size 10000
+./bin/mfsdns -file records.tsv -port 5353 -size 10000
 ```
 
 Or install directly with Go (if you prefer):
@@ -68,19 +68,19 @@ dig @127.0.0.1 -p 5353 checkstatus.local. TXT +short
 
 ## Running as a service (systemd example)
 
-Create `/etc/systemd/system/steindns.service` and adjust paths/users as needed:
+Create `/etc/systemd/system/mfsdns.service` and adjust paths/users as needed:
 
 ````ini
 [Unit]
-Description=steindns - Lightweight DNS server
+Description=mfsdns - Lightweight DNS server
 After=network.target
 
 [Service]
 Type=simple
 User=nobody
 Group=nogroup
-ExecStart=/usr/local/bin/steindns -file /etc/steindns/records.tsv -port 5353 -size 20000
-WorkingDirectory=/var/lib/steindns
+ExecStart=/usr/local/bin/mfsdns -file /etc/mfsdns/records.tsv -port 5353 -size 20000
+WorkingDirectory=/var/lib/mfsdns
 Restart=on-failure
 RestartSec=5
 
@@ -91,11 +91,11 @@ WantedBy=multi-user.target
 Enable and start:
 
 ```bash
-sudo mkdir -p /etc/steindns /var/lib/steindns
-sudo cp records.tsv /etc/steindns/records.tsv
+sudo mkdir -p /etc/mfsdns /var/lib/mfsdns
+sudo cp records.tsv /etc/mfsdns/records.tsv
 sudo systemctl daemon-reload
-sudo systemctl enable --now steindns
-sudo systemctl status steindns
+sudo systemctl enable --now mfsdns
+sudo systemctl status mfsdns
 ```
 
 ## Reloading records

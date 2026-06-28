@@ -8,12 +8,12 @@ bin/mfsdns: $(SRCS)
 	go build -ldflags="-s -w" -o bin/mfsdns main.go
 	@if [ "$$MAFSDEVOPS" = "1" ]; then \
 		echo "MAFSDEVOPS - Staging files " && \
-		echo git add . && \
+		git add . && \
 		echo "MAFSDEVOPS - Test scripts" && \
 		bash scripts/test.sh && \
 		echo "MAFSDEVOPS - Tests ok - commiting work " && \
-		echo git commit . && \
-		echo git push && \
+		git commit . && \
+		git push && \
 		echo "MAFSDEVOPS -DONE-" ; \
 	else \
 		echo "MAFSDEVOPS is not set to 1. Skipping git add."; \
