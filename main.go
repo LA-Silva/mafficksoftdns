@@ -35,6 +35,7 @@ var (
 	// Flags
 	maxRecords int
 	port       int
+	listenAddr string
 	tsvPath    string
 
 	// Stats & Rotation Counters
@@ -182,6 +183,7 @@ func main() {
 
 	flag.IntVar(&maxRecords, "size", 10000, "Maximum records per buffer")
 	flag.IntVar(&port, "port", 5353, "UDP port")
+	flag.StringVar(&listenAddr, "listen", "", "Listen IP address (default: all interfaces)")
 	flag.StringVar(&tsvPath, "file", "records.tsv", "TSV file path")
 
 	flag.Usage = func() {
@@ -212,7 +214,8 @@ func main() {
 	}()
 
 	dns.HandleFunc(".", handleDnsRequest)
-	addr := fmt.Sprintf(":%d", port)
+	//addr := fmt.Sprintf(":%d", port)
+	addr := net.JoinHostPort(listenAddr, fmt.Sprintf("%d", port))
 	log.Printf("%s live on %s (PID: %d) with capacity %d", appName, addr, os.Getpid(), maxRecords)
 	log.Fatal(dns.ListenAndServe(addr, "udp", nil))
 }
