@@ -1,56 +1,62 @@
-# Compile & Install
+# Compile & Install (updated for GitHub)
 
-This document explains how to compile, install, run, and verify the mfsdns binary included in this repository (mafficksoftdns).
+This document explains how to compile, install, run, and verify the steindns binary included in this repository (mafficksoftdns). It also includes GitHub-specific installation options (go install, Releases).
+
+## Status on GitHub
+
+- The repository is hosted at https://github.com/LA-Silva/mafficksoftdns
+- You can view source, download ZIPs, and (if provided by the maintainer) download pre-built binaries from the Releases tab.
+- This file was updated to include GitHub-centric install methods such as `go install` and downloading from Releases.
 
 ## Prerequisites
 
 - Go toolchain (version >= 1.25.5). The repository's go.mod specifies `go 1.25.5` — using that version or a newer stable Go is recommended.
-- Git (to clone the repository) if you haven't already.
+- Git (to clone the repository) if you haven't already, or use GitHub's ZIP download.
 - A POSIX-like environment (Linux/macOS). The examples use Linux paths and systemd.
 
-## Clone the repository
+## Ways to obtain the binary
+
+1) Install from source (recommended for contributors)
 
 ```bash
 git clone https://github.com/LA-Silva/mafficksoftdns.git
 cd mafficksoftdns
-```
-
-## Build (compile)
-
-This repository includes a small build helper script `build.sh`. You can either use it or run go build directly.
-
-Option A — using the provided script:
-
-```bash
-# Makes bin/mfsdns using the flags in build.sh
+# Build with helper script
 ./build.sh
+# or build directly
+mkdir -p bin
+go build -ldflags='-s -w' -o bin/steindns main.go
 ```
 
-Option B — using go build directly (equivalent):
+2) Install using `go install` (Go 1.20+ style)
+
+If you just want to install the binary via Go (no cloning needed), and you have Go configured with a working `GOBIN` or `GOPATH/bin` on your PATH:
 
 ```bash
-# Create the output directory then build
-mkdir -p bin
-go build -ldflags='-s -w' -o bin/mfsdns main.go
+# Installs the module at the latest version to $GOBIN or $GOPATH/bin
+go install github.com/LA-Silva/mafficksoftdns@latest
+# Verify
+which steindns || echo $GOBIN
 ```
 
 Notes:
-- The `-ldflags='-s -w'` strip debug information producing a smaller binary. Remove them if you want debug symbols.
-- If you prefer `go install`, you can run `go install` from module root and the binary will be installed under your Go bin directory (e.g. $GOBIN or $GOPATH/bin).
+- `go install <module>@latest` downloads, builds, and installs the binary in your Go bin directory.
+- This requires a recent Go toolchain that supports module-aware `go install` with version suffixes.
+
+3) Download a release binary (if available)
+
+- Check the repository's Releases tab on GitHub: https://github.com/LA-Silva/mafficksoftdns/releases
+- Download the archive for your platform, extract, and move the `steindns` binary to a directory on your PATH (for example `/usr/local/bin`).
 
 ## Install (system-wide)
 
 To install the compiled binary system-wide (requires root):
 
 ```bash
-sudo install -m 0755 bin/mfsdns /usr/local/bin/mfsdns
-```
-
-Or copy manually:
-
-```bash
-sudo cp bin/mfsdns /usr/local/bin/
-sudo chmod 755 /usr/local/bin/mfsdns
+sudo install -m 0755 bin/steindns /usr/local/bin/steindns
+# or
+sudo cp bin/steindns /usr/local/bin/
+sudo chmod 755 /usr/local/bin/steindns
 ```
 
 ## Configuration & Running
@@ -64,7 +70,7 @@ The server reads records from a TSV file (default `records.tsv` in the repo root
 Example run (foreground):
 
 ```bash
-/usr/local/bin/mfsdns -file /path/to/records.tsv -port 5353 -size 20000
+/usr/local/bin/steindns -file /path/to/records.tsv -port 5353 -size 20000
 ```
 
 The server supports reloading the TSV on receipt of SIGHUP. For example:
@@ -84,21 +90,26 @@ dig @127.0.0.1 -p 5353 checkstatus.local. TXT +short
 
 You should see a TXT string containing STATUS=OK, request counts, RPS and uptime.
 
+## GitHub Actions / CI
+
+- If this repository includes a GitHub Actions workflow to build artifacts, you may find pre-built binaries attached to a workflow run or Release. Check the Actions tab on GitHub for CI build logs and artifacts.
+- If you want to add a workflow to build and publish releases, a simple GitHub Actions job can run `go build` for multiple OS/ARCH targets and attach artifacts to a Release.
+
 ## Systemd service example (Linux)
 
-Create a unit file `/etc/systemd/system/mfsdns.service` with the following contents (adjust paths and user as needed):
+Create a unit file `/etc/systemd/system/steindns.service` with the following contents (adjust paths and user as needed):
 
 ````ini
 [Unit]
-Description=mfsdns - Lightweight DNS server
+Description=steindns - Lightweight DNS server
 After=network.target
 
 [Service]
 Type=simple
 User=nobody
 Group=nogroup
-ExecStart=/usr/local/bin/mfsdns -file /etc/mfsdns/records.tsv -port 5353 -size 20000
-WorkingDirectory=/var/lib/mfsdns
+ExecStart=/usr/local/bin/steindns -file /etc/steindns/records.tsv -port 5353 -size 20000
+WorkingDirectory=/var/lib/steindns
 Restart=on-failure
 RestartSec=5
 
@@ -106,14 +117,14 @@ RestartSec=5
 WantedBy=multi-user.target
 ````
 
-After creating the unit and placing your `records.tsv` under `/etc/mfsdns/` (or other chosen location), enable and start the service:
+After creating the unit and placing your `records.tsv` under `/etc/steindns/` (or other chosen location), enable and start the service:
 
 ```bash
-sudo mkdir -p /etc/mfsdns /var/lib/mfsdns
-sudo cp records.tsv /etc/mfsdns/records.tsv
+sudo mkdir -p /etc/steindns /var/lib/steindns
+sudo cp records.tsv /etc/steindns/records.tsv
 sudo systemctl daemon-reload
-sudo systemctl enable --now mfsdns
-sudo systemctl status mfsdns
+sudo systemctl enable --now steindns
+sudo systemctl status steindns
 ```
 
 ## Example records.tsv format
@@ -150,12 +161,14 @@ go mod tidy
 To remove the installed binary and unit file:
 
 ```bash
-sudo systemctl disable --now mfsdns
-sudo rm /etc/systemd/system/mfsdns.service
+sudo systemctl disable --now steindns
+sudo rm /etc/systemd/system/steindns.service
 sudo systemctl daemon-reload
-sudo rm /usr/local/bin/mfsdns
+sudo rm /usr/local/bin/steindns
 ```
 
-## Contact / Notes
+## Where to find help
 
-This project is MIT-style (no license file provided in this repository snapshot). Check the repository for a license or contact the maintainer for redistribution/use details.
+- Repository: https://github.com/LA-Silva/mafficksoftdns
+- Open an issue on GitHub if you encounter bugs or need features.
+
