@@ -97,6 +97,69 @@ for i in {1..3}; do
     sleep 0.5
 done
 
+echo "================================================================="
+echo -n " 6. MX Record Query.................... "
+
+RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com MX +short)
+EXPECTED="10 mail.mafficksoft.com."
+if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+
+echo "================================================================="
+echo -n " 7. AAAA (IPv6) Record Query........... "
+
+RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com AAAA +short)
+EXPECTED="2001:db8::10"
+if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+
+echo "================================================================="
+echo -n " 8. CNAME Record Query................ "
+
+RESULT=$(dig @$DNS_SERVER -p $DNS_PORT www.mafficksoft.com CNAME +short)
+EXPECTED="mafficksoft.com."
+if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+
+echo "================================================================="
+echo -n " 9. TXT Record Query.................. "
+
+RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com TXT +short)
+EXPECTED="\"v=spf1 include:_spf.google.com ~all\""
+if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+
+echo "================================================================="
+echo -n " 10. NS Record Query.................. "
+
+RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com NS +short)
+EXPECTED="ns1.mafficksoft.com."
+if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+
+echo "================================================================="
+echo -n " 11. SRV Record Query (SIP)........... "
+
+RESULT=$(dig @$DNS_SERVER -p $DNS_PORT _sip._udp.mafficksoft.com SRV +short)
+EXPECTED="10 50 5060 voice.mafficksoft.com."
+if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+
+echo "================================================================="
+echo -n " 12. SRV Record Query (SSH)........... "
+
+RESULT=$(dig @$DNS_SERVER -p $DNS_PORT _ssh._tcp.infra.local SRV +short)
+EXPECTED="0 0 22 bastion.infra.local."
+if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+
+echo "================================================================="
+echo -n " 13. CNAME Alias Resolution........... "
+
+RESULT=$(dig @$DNS_SERVER -p $DNS_PORT backup.local CNAME +short)
+EXPECTED="nas.local."
+if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+
+echo "================================================================="
+echo -n " 14. Multiple A Records (web.local)... "
+
+RESULT=$(dig @$DNS_SERVER -p $DNS_PORT web.local A +short | sort)
+EXPECTED=$(printf "192.168.1.10\n192.168.1.11\n192.168.1.12")
+if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+
 # Cleanup
 rm ./tmp/$TSV_FILE
 # stop daemon
