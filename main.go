@@ -23,6 +23,18 @@ type DataStore struct {
 	Records map[string]map[uint16][]dns.RR
 }
 
+type RateLimiter struct {
+	mu         sync.Mutex
+	clients    map[string]*ClientRateLimit
+	lastReset  time.Time
+	resetTimer *time.Ticker
+}
+
+type ClientRateLimit struct {
+	count     int
+	resetTime time.Time
+}
+
 var (
 	// Application Customization
 	appName = "mfsdns"
@@ -37,14 +49,69 @@ var (
 	port       int
 	listenAddr string
 	tsvPath    string
+	rateLimit  int
 
 	// Stats & Rotation Counters
 	queryCounter uint64
 	rps1m        float64
 	rps5m        float64
+
+	// Rate Limiter
+	limiter *RateLimiter
 )
 
 const HealthCheckDomain = "checkstatus.local."
+
+func NewRateLimiter() *RateLimiter {
+	rl := &RateLimiter{
+		clients:   make(map[string]*ClientRateLimit),
+		lastReset: time.Now(),
+	}
+	// Start a ticker to reset counters every second
+	rl.resetTimer = time.NewTicker(1 * time.Second)
+	go func() {
+		for range rl.resetTimer.C {
+			rl.resetCounters()
+		}
+	}()
+	return rl
+}
+
+func (rl *RateLimiter) resetCounters() {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+	rl.clients = make(map[string]*ClientRateLimit)
+	rl.lastReset = time.Now()
+}
+
+func (rl *RateLimiter) isAllowed(clientIP string) bool {
+	rl.mu.Lock()
+	defer rl.mu.Unlock()
+
+	client, exists := rl.clients[clientIP]
+	if !exists {
+		rl.clients[clientIP] = &ClientRateLimit{
+			count:     1,
+			resetTime: time.Now().Add(1 * time.Second),
+		}
+		return true
+	}
+
+	// Check if we need to reset this client's counter
+	if time.Now().After(client.resetTime) {
+		client.count = 1
+		client.resetTime = time.Now().Add(1 * time.Second)
+		return true
+	}
+
+	// Check if limit is exceeded
+	if client.count >= rateLimit {
+		return false
+	}
+
+	client.count++
+	return true
+}
 
 func loadRecords() error {
 	reloadLock.Lock()
@@ -141,6 +208,19 @@ func monitorStats() {
 }
 
 func handleDnsRequest(w dns.ResponseWriter, r *dns.Msg) {
+	// Extract client IP
+	remoteAddr := w.RemoteAddr().String()
+	clientIP, _, err := net.SplitHostPort(remoteAddr)
+	if err != nil {
+		clientIP = remoteAddr
+	}
+
+	// Check rate limit
+	if !limiter.isAllowed(clientIP) {
+		// Silently drop the request (don't respond)
+		return
+	}
+
 	reqID := atomic.AddUint64(&queryCounter, 1)
 
 	m := new(dns.Msg)
@@ -190,6 +270,7 @@ func main() {
 	flag.IntVar(&port, "port", 5353, "UDP port")
 	flag.StringVar(&listenAddr, "listen", "", "Listen IP address (default: all interfaces)")
 	flag.StringVar(&tsvPath, "file", "records.tsv", "TSV file path")
+	flag.IntVar(&rateLimit, "ratelimit", 20, "Rate limit: queries per second per IP (default: 20)")
 
 	flag.Usage = func() {
 		fmt.Fprintf(os.Stderr, "%s - Extreme Stable DNS\nUsage:\n", appName)
@@ -201,6 +282,9 @@ func main() {
 	for i := 0; i < 2; i++ {
 		buffers[i] = &DataStore{Records: make(map[string]map[uint16][]dns.RR)}
 	}
+
+	// Initialize rate limiter
+	limiter = NewRateLimiter()
 
 	if err := loadRecords(); err != nil {
 		log.Fatalf("Initial load failed: %v", err)
@@ -221,6 +305,6 @@ func main() {
 	dns.HandleFunc(".", handleDnsRequest)
 	//addr := fmt.Sprintf(":%d", port)
 	addr := net.JoinHostPort(listenAddr, fmt.Sprintf("%d", port))
-	log.Printf("%s live on %s (PID: %d) with capacity %d", appName, addr, os.Getpid(), maxRecords)
+	log.Printf("%s live on %s (PID: %d) with capacity %d, rate limit %d queries/sec per IP", appName, addr, os.Getpid(), maxRecords, rateLimit)
 	log.Fatal(dns.ListenAndServe(addr, "udp", nil))
 }
