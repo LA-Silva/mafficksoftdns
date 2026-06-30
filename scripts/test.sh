@@ -15,6 +15,15 @@ log_output() {
 	echo "$@" | tee -a "$LOG_FILE"
 }
 
+# Function to print test header with right-aligned status
+print_test_header() {
+	local test_num="$1"
+	local test_name="$2"
+	local status="$3"
+	# Use printf to pad the line to 80 characters with PASS/FAIL right-aligned
+	printf "Test %-3s %-55s %s\n" "$test_num." "$test_name" "$status" | tee -a "$LOG_FILE"
+}
+
 OVERALL="YES"
 TEST_DOMAIN="web.local." # Change this to a domain that exists in your records.tsv
 
@@ -49,7 +58,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -67,7 +76,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -86,7 +95,7 @@ else
 	EXPECTED="STATUS=OK (in TXT response)"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -107,7 +116,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -138,7 +147,7 @@ for i in {1..3}; do
 		STATUS="FAIL"
 		OVERALL="NO"
 	fi
-	log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+	print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 	log_output "input:  $INPUT_CMD"
 	log_output "expected: $EXPECTED_RESULT"
 	log_output "result: $RESULT"
@@ -158,7 +167,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -176,7 +185,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -194,7 +203,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -212,7 +221,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -230,7 +239,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -248,7 +257,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -266,7 +275,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -284,7 +293,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $EXPECTED"
 log_output "result: $RESULT"
@@ -302,7 +311,7 @@ else
 	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "Test $TEST_NUM. $TEST_NAME.................................. $STATUS"
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
 log_output "input:  $INPUT_CMD"
 log_output "expected: $(echo "$EXPECTED" | sed 's/^/                 /' | sed '1s/^                 //')"
 log_output "result: $(echo "$RESULT" | sed 's/^/           /' | sed '1s/^           //')"
@@ -315,9 +324,9 @@ kill -9 $PID
 
 log_output "================================================================="
 if [ "$OVERALL" == "YES" ]; then
-	log_output "Overall Testing Results .............. PASS"
+	log_output "Overall Testing Results                                         PASS"
 	exit 0
 else
-	log_output "Overall Testing Results .............. FAIL"
+	log_output "Overall Testing Results                                         FAIL"
 	exit 1
 fi
