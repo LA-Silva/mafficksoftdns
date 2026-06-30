@@ -94,6 +94,11 @@ func loadRecords() error {
 		qType := dns.StringToType[typeStr]
 		val := row[2]
 
+		// TXT records need to be quoted
+		if typeStr == "TXT" {
+			val = fmt.Sprintf("\"%s\"", val)
+		}
+
 		// Pre-compile the resource record string into a dns.RR object right here during load time
 		rrStr := fmt.Sprintf("%s %s IN %s %s", name, ttlVal, typeStr, val)
 		rr, err := dns.NewRR(rrStr)

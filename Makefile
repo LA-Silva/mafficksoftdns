@@ -20,3 +20,5 @@ bin/mfsdns: $(SRCS)
 	fi
 
 
+clean :
+	rm bin/mfsdns

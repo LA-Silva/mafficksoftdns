@@ -29,28 +29,28 @@ else
 fi
 
 echo "================================================================="
-echo -n " 1. Standard A Record.................. "
+echo -n " 1. Standard A Record................. "
 
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com A +short)
 EXPECTED="1.2.3.4"
 if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
 
 echo "================================================================="
-echo -n " 2. Case Insensitivity (ExAmPlE.CoM)... "
+echo -n " 2. Case Insensitivity (ExAmPlE.CoM).. "
 
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT MaFFiCksoft.CoM A +short)
 EXPECTED="1.2.3.4"
 if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED )"; OVERALL="NO"; fi
 
 echo "================================================================="
-echo -n " 3. Internal Health Check.............. "
+echo -n " 3. Internal Health Check............. "
 
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT checkstatus.local TXT +short)
 
 if [[ $RESULT == *"STATUS=OK"* ]]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: STATUS=OK )"; OVERALL="NO"; fi
 
 echo "================================================================="
-echo -n " 4. Testing Atomic Reload via SIGHUP... "
+echo -n " 4. Testing Atomic Reload via SIGHUP.. "
 
 echo -e "reload.test.\tA\t9.9.9.9\t0" >> ./tmp/$TSV_FILE
 kill -HUP $PID
@@ -63,8 +63,8 @@ else
     echo "FAIL: New Record not found."
 	OVERALL="NO"
 fi
-echo "================================================================="
 for i in {1..3}; do
+	echo "================================================================="
     # Runs dig, extracts just the IP addresses/values from the answer section
     RESULT=$(dig "@${DNS_SERVER}" -p "${DNS_PORT}" "${TEST_DOMAIN}" A +short)
     case $i in 
@@ -83,29 +83,28 @@ for i in {1..3}; do
     esac
 	MEXPECTED_RESULT="${EXPECTED_RESULT//[$'\r\n ']}"
 	MRESULT="${RESULT//[$'\r\n ']}"
-	echo -n " 5.${i} Round Robin Query reload #${i} ...... " 
+	echo -n " 5.${i} Round Robin Query reload #${i} ..... " 
 	if [ "$MRESULT" == "$MEXPECTED_RESULT" ]; then
 		echo "PASS"
 	else 
 		echo "FAIL"
 		OVERALL="NO"
+		echo "Result:" $RESULT
+		echo "expected: ($EXPECTED_RESULT)"
 	fi
-    echo "Result:" $RESULT
-	echo "expected: ($EXPECTED_RESULT)"
 
-	echo "================================================================="
     sleep 0.5
 done
 
 echo "================================================================="
-echo -n " 6. MX Record Query.................... "
+echo -n " 6. MX Record Query................... "
 
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com MX +short)
 EXPECTED="10 mail.mafficksoft.com."
 if [ "$RESULT" == "$EXPECTED" ]; then echo "PASS"; else echo "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
 
 echo "================================================================="
-echo -n " 7. AAAA (IPv6) Record Query........... "
+echo -n " 7. AAAA (IPv6) Record Query.......... "
 
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com AAAA +short)
 EXPECTED="2001:db8::10"
@@ -165,7 +164,9 @@ rm ./tmp/$TSV_FILE
 # stop daemon
 kill -9 $PID 
 
-echo -n " Overall Testing Results .............. "
+echo "================================================================="
+echo -n " Overall Testing Results ............. "
+
 if [ "$OVERALL" == "YES" ]; then
 	echo "PASS"
 	exit 0
