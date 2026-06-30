@@ -28,144 +28,257 @@ if [ -z "$PID" ]; then
 		log_output "couldnt daemon mode start tests -FAIL"
 		exit 1
 	fi
-	log_output "Starting daemon (PID: $PID) "
+	log_output "Starting daemon (PID: $PID)"
 
 else
 	log_output "mfsdns shouldnt run already? Kill $PID."
 	exit 1
 fi
 
-log_output "================================================================="
-log_output -n " 1. Standard A Record................. "
+log_output ""
 
+# Test 1: Standard A Record
+TEST_NUM=1
+TEST_NAME="Standard A Record"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com A +short)
 EXPECTED="1.2.3.4"
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 2. Case Insensitivity (ExAmPlE.CoM).. "
-
+# Test 2: Case Insensitivity
+TEST_NUM=2
+TEST_NAME="Case Insensitivity (ExAmPlE.CoM)"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT MaFFiCksoft.CoM A +short)
 EXPECTED="1.2.3.4"
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED )"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 3. Internal Health Check............. "
-
+# Test 3: Internal Health Check
+TEST_NUM=3
+TEST_NAME="Internal Health Check"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT checkstatus.local TXT +short)
+if [[ $RESULT == *"STATUS=OK"* ]]; then 
+	STATUS="PASS"
+	EXPECTED="STATUS=OK (in TXT response)"
+else 
+	STATUS="FAIL"
+	EXPECTED="STATUS=OK (in TXT response)"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-if [[ $RESULT == *"STATUS=OK"* ]]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: STATUS=OK )"; OVERALL="NO"; fi
-
-log_output "================================================================="
-log_output -n " 4. Testing Atomic Reload via SIGHUP.. "
-
+# Test 4: Testing Atomic Reload via SIGHUP
+TEST_NUM=4
+TEST_NAME="Testing Atomic Reload via SIGHUP"
 echo -e "reload.test.\tA\t9.9.9.9\t0" >> ./tmp/$TSV_FILE
 kill -HUP $PID
 sleep 1 # Give it a moment to swap buffers
-
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT reload.test A +short)
-if [ "$RESULT" == "9.9.9.9" ]; then 
-    log_output "PASS"
+EXPECTED="9.9.9.9"
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
 else 
-    log_output "FAIL: New Record not found."
+	STATUS="FAIL"
 	OVERALL="NO"
 fi
-log_output "================================================================="
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
+
+# Test 5: Round Robin Query
 for i in {1..3}; do
-    # Runs dig, extracts just the IP addresses/values from the answer section
     RESULT=$(dig "@${DNS_SERVER}" -p "${DNS_PORT}" "${TEST_DOMAIN}" A +short)
     case $i in 
         1)
 			EXPECTED_RESULT="192.168.1.12 192.168.1.10 192.168.1.11"
-            ;; # <-- Required to close the case item
+            ;; 
         2) 
 			EXPECTED_RESULT="192.168.1.10 192.168.1.11 192.168.1.12"
             ;; 
         3)
 			EXPECTED_RESULT="192.168.1.11 192.168.1.12 192.168.1.10"
             ;;
-        *)
-            log_output "Invalid selection. Please choose 1, 2, or 3."
-            ;;
     esac
 	MEXPECTED_RESULT="${EXPECTED_RESULT//[$'\r\n ']}"
 	MRESULT="${RESULT//[$'\r\n ']}"
-	log_output -n " 5.${i} Round Robin Query reload #${i} ..... " 
+	TEST_NUM="5.$i"
+	TEST_NAME="Round Robin Query reload #${i}"
 	if [ "$MRESULT" == "$MEXPECTED_RESULT" ]; then
-		log_output "PASS"
+		STATUS="PASS"
 	else 
-		log_output "FAIL"
+		STATUS="FAIL"
 		OVERALL="NO"
 	fi
-    log_output "Result:" $RESULT
-	log_output "expected: ($EXPECTED_RESULT)"
-
-	log_output "================================================================="
+	log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+	log_output "expected: $EXPECTED_RESULT"
+	log_output "result: $RESULT"
+	log_output ""
     sleep 0.5
 done
 
-log_output "================================================================="
-log_output -n " 6. MX Record Query................... "
-
+# Test 6: MX Record Query
+TEST_NUM=6
+TEST_NAME="MX Record Query"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com MX +short)
 EXPECTED="10 mail.mafficksoft.com."
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 7. AAAA (IPv6) Record Query.......... "
-
+# Test 7: AAAA (IPv6) Record Query
+TEST_NUM=7
+TEST_NAME="AAAA (IPv6) Record Query"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com AAAA +short)
 EXPECTED="2001:db8::10"
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 8. CNAME Record Query................ "
-
+# Test 8: CNAME Record Query
+TEST_NUM=8
+TEST_NAME="CNAME Record Query"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT www.mafficksoft.com CNAME +short)
 EXPECTED="mafficksoft.com."
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 9. TXT Record Query.................. "
-
+# Test 9: TXT Record Query
+TEST_NUM=9
+TEST_NAME="TXT Record Query"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com TXT +short)
 EXPECTED="\"v=spf1 include:_spf.google.com ~all\""
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 10. NS Record Query.................. "
-
+# Test 10: NS Record Query
+TEST_NUM=10
+TEST_NAME="NS Record Query"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com NS +short)
 EXPECTED="ns1.mafficksoft.com."
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 11. SRV Record Query (SIP)........... "
-
+# Test 11: SRV Record Query (SIP)
+TEST_NUM=11
+TEST_NAME="SRV Record Query (SIP)"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT _sip._udp.mafficksoft.com SRV +short)
 EXPECTED="10 50 5060 voice.mafficksoft.com."
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 12. SRV Record Query (SSH)........... "
-
+# Test 12: SRV Record Query (SSH)
+TEST_NUM=12
+TEST_NAME="SRV Record Query (SSH)"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT _ssh._tcp.infra.local SRV +short)
 EXPECTED="0 0 22 bastion.infra.local."
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 13. CNAME Alias Resolution........... "
-
+# Test 13: CNAME Alias Resolution
+TEST_NUM=13
+TEST_NAME="CNAME Alias Resolution"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT backup.local CNAME +short)
 EXPECTED="nas.local."
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
-log_output "================================================================="
-log_output -n " 14. Multiple A Records (web.local)... "
-
+# Test 14: Multiple A Records (web.local)
+TEST_NUM=14
+TEST_NAME="Multiple A Records (web.local)"
 RESULT=$(dig @$DNS_SERVER -p $DNS_PORT web.local A +short | sort)
 EXPECTED=$(printf "192.168.1.10\n192.168.1.11\n192.168.1.12")
-if [ "$RESULT" == "$EXPECTED" ]; then log_output "PASS"; else log_output "FAIL (Got: $RESULT Expected: $EXPECTED)"; OVERALL="NO"; fi
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+log_output "Test $TEST_NUM. $TEST_NAME................. $STATUS"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
 
 # Cleanup
 rm ./tmp/$TSV_FILE
@@ -173,11 +286,10 @@ rm ./tmp/$TSV_FILE
 kill -9 $PID 
 
 log_output "================================================================="
-log_output -n " Overall Testing Results ............. "
 if [ "$OVERALL" == "YES" ]; then
-	log_output "PASS"
+	log_output "Overall Testing Results .............. PASS"
 	exit 0
 else
-	log_output "FAIL! "
+	log_output "Overall Testing Results .............. FAIL"
 	exit 1
 fi
