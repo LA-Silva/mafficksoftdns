@@ -1,0 +1,116 @@
+    Starting daemon (PID: 68945)
+    
+NR  Description                                             Result
+    
+=== ======================================================= ======
+1   Standard A Record                                       OK
+    
+    input   : dig @127.0.0.1 -p 15353 mafficksoft.com A +short
+    expected: 1.2.3.4
+    result  : 1.2.3.4
+    
+2   Case Insensitivity (ExAmPlE.CoM)                        OK
+    
+    input   : dig @127.0.0.1 -p 15353 MaFFiCksoft.CoM A +short
+    expected: 1.2.3.4
+    result  : 1.2.3.4
+    
+3   Internal Health Check                                   OK
+    
+    input   : dig @127.0.0.1 -p 15353 checkstatus.local TXT +short
+    expected: STATUS=OK
+    result  : "STATUS=OK; REQS=3; RPS_1M=0.00; RPS_5M=0.00; UPTIME=1s"
+    
+4   Testing Atomic Reload via SIGHUP                        OK
+    
+    input   : dig @127.0.0.1 -p 15353 reload.test A +short
+    expected: 9.9.9.9
+    result  : 9.9.9.9
+    
+5.1 Round Robin Query reload #1                             OK
+    
+    input   : dig @127.0.0.1 -p 15353 web.local. A +short
+    expected: 9.9.9.9
+    result  : 192.168.1.12
+              192.168.1.10
+              192.168.1.11
+    
+5.2 Round Robin Query reload #2                             OK
+    
+    input   : dig @127.0.0.1 -p 15353 web.local. A +short
+    expected: 9.9.9.9
+    result  : 192.168.1.10
+              192.168.1.11
+              192.168.1.12
+    
+5.3 Round Robin Query reload #3                             OK
+    
+    input   : dig @127.0.0.1 -p 15353 web.local. A +short
+    expected: 9.9.9.9
+    result  : 192.168.1.11
+              192.168.1.12
+              192.168.1.10
+    
+6   MX Record Query                                         OK
+    
+    input   : dig @127.0.0.1 -p 15353 mafficksoft.com MX +short
+    expected: 10 mail.mafficksoft.com.
+    result  : 10 mail.mafficksoft.com.
+    
+7   AAAA (IPv6) Record Query                                OK
+    
+    input   : dig @127.0.0.1 -p 15353 mafficksoft.com AAAA +short
+    expected: 2001:db8::10
+    result  : 2001:db8::10
+    
+8   CNAME Record Query                                      OK
+    
+    input   : dig @127.0.0.1 -p 15353 www.mafficksoft.com CNAME +short
+    expected: mafficksoft.com.
+    result  : mafficksoft.com.
+    
+9   TXT Record Query                                        OK
+    
+    input   : dig @127.0.0.1 -p 15353 mafficksoft.com TXT +short
+    expected: "v=spf1 include:_spf.google.com ~all"
+    result  : "v=spf1 include:_spf.google.com ~all"
+    
+10  NS Record Query                                         OK
+    
+    input   : dig @127.0.0.1 -p 15353 mafficksoft.com NS +short
+    expected: ns1.mafficksoft.com.
+    result  : ns1.mafficksoft.com.
+    
+11  SRV Record Query (SIP)                                  OK
+    
+    input   : dig @127.0.0.1 -p 15353 _sip._udp.mafficksoft.com SRV +short
+    expected: 10 50 5060 voice.mafficksoft.com.
+    result  : 10 50 5060 voice.mafficksoft.com.
+    
+12  SRV Record Query (SSH)                                  OK
+    
+    input   : dig @127.0.0.1 -p 15353 _ssh._tcp.infra.local SRV +short
+    expected: 0 0 22 bastion.infra.local.
+    result  : 0 0 22 bastion.infra.local.
+    
+13  CNAME Alias Resolution                                  OK
+    
+    input   : dig @127.0.0.1 -p 15353 backup.local CNAME +short
+    expected: nas.local.
+    result  : nas.local.
+    
+14  Multiple A Records (web.local)                          OK
+    
+    
+    input   : dig @127.0.0.1 -p 15353 web.local A +short
+    expected: 192.168.1.10
+              192.168.1.11
+              192.168.1.12
+    result  : 192.168.1.10
+              192.168.1.11
+              192.168.1.12
+    
+    
+=== =======================================                 ======
+    Overall Testing Results                                 PASSED
+    
