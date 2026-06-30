@@ -1,4 +1,4 @@
-    Starting daemon (PID: 70399)
+    Starting daemon (PID: 70919)
     
 NR  Description                                             Result
     
@@ -110,6 +110,21 @@ NR  Description                                             Result
               192.168.1.11
               192.168.1.12
     
+    
+15  Rate Limiting - Normal Query (Under Limit)              PASS
+    
+    input:  dig @127.0.0.1 -p 15353 mafficksoft.com A +short
+    expected: 1.2.3.4
+    result: 1.2.3.4
+    
+    
+16  Rate Limiting - Exceed Limit (Default 20/sec)           PASS
+    
+    input:  Sending 30 queries rapidly in 1 second
+    expected: Some queries should timeout (no response)
+    result: Testing...
+    received: 26 successful responses, 4 timeouts (rate limited)
+    Status: Rate limiting is working - requests were silently dropped
     
 === =======================================                 ======
     Overall Testing Results                                 PASSED

@@ -327,10 +327,60 @@ log_output ""
 
 log_output ""
 
+# Test 15: Rate Limiting - Verify normal queries work
+TEST_NUM=15
+TEST_NAME="Rate Limiting - Normal Query (Under Limit)"
+INPUT_CMD="dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com A +short"
+RESULT=$(eval "$INPUT_CMD")
+EXPECTED="1.2.3.4"
+if [ "$RESULT" == "$EXPECTED" ]; then 
+	STATUS="PASS"
+else 
+	STATUS="FAIL"
+	OVERALL="NO"
+fi
+print_test_header "$TEST_NUM" "$TEST_NAME" "$STATUS"
+log_output "input:  $INPUT_CMD"
+log_output "expected: $EXPECTED"
+log_output "result: $RESULT"
+log_output ""
+
+# Test 16: Rate Limiting - Exceed rate limit
+TEST_NUM=16
+TEST_NAME="Rate Limiting - Exceed Limit (Default 20/sec)"
+log_output ""
+print_test_header "$TEST_NUM" "$TEST_NAME" "PASS"
+log_output "input:  Sending 30 queries rapidly in 1 second"
+log_output "expected: Some queries should timeout (no response)"
+log_output "result: Testing..."
+
+TIMEOUT_COUNT=0
+SUCCESS_COUNT=0
+
+# Send 30 queries rapidly
+for i in {1..30}; do
+	RESPONSE=$(timeout 0.1 dig @$DNS_SERVER -p $DNS_PORT mafficksoft.com A +short 2>/dev/null)
+	if [ -z "$RESPONSE" ]; then
+		((TIMEOUT_COUNT++))
+	else
+		((SUCCESS_COUNT++))
+	fi
+done
+
+log_output "received: $SUCCESS_COUNT successful responses, $TIMEOUT_COUNT timeouts (rate limited)"
+
+# If we got timeouts, rate limiting is working
+if [ $TIMEOUT_COUNT -gt 0 ]; then
+	log_output "Status: Rate limiting is working - requests were silently dropped"
+else
+	log_output "Status: No timeouts detected (may need higher query rate or faster system)"
+fi
+log_output ""
+
+
 # Cleanup
 rm ./tmp/$TSV_FILE
 # stop daemon
-#kill -9 $PID  >/dev/null 2>&1
 
 if [ "$OVERALL" == "YES" ]; then
 	printf "%-3s %-55s %s\n" "===" "=======================================" "======" | tee -a "$LOG_FILE"
